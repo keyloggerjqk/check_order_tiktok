@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "functions": {
+    "api/check-order.js": {
+      "maxDuration": 30
+    }
+  }
+}
+

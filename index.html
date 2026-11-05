@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok Shop Order Checker</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 24px 16px;
+    }
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+      color: #38bdf8;
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    input {
+      flex: 1;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 14px;
+    }
+    button {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      background: #fe2c55;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .order-header {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 14px;
+    }
+    .order-header img {
+      width: 68px;
+      height: 68px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #0f172a;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #0284c7;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 10px;
+      font-size: 14px;
+      margin-bottom: 14px;
+    }
+    .label { color: #94a3b8; font-size: 12px; }
+    .val { font-weight: 500; margin-top: 2px; word-break: break-word; }
+    .timeline {
+      border-top: 1px solid #334155;
+      padding-top: 12px;
+      margin-top: 10px;
+    }
+    .step {
+      padding: 8px 0 8px 14px;
+      border-left: 2px solid #38bdf8;
+      margin-left: 6px;
+      font-size: 13px;
+    }
+    .step-time { color: #94a3b8; font-size: 12px; }
+    pre {
+      background: #020617;
+      padding: 14px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tra cứu Đơn hàng TikTok Shop qua Cookie SessionID</h1>
+    <div class="search-box">
+      <input id="sidInput" placeholder="Dán sessionid=... hoặc chuỗi hex sessionid vào đây" />
+      <button id="checkBtn" onclick="checkOrder()">Kiểm tra</button>
+    </div>
+    <div id="resultArea"></div>
+  </div>
+
+  <script>
+    async function checkOrder() {
+      const sid = document.getElementById("sidInput").value.trim();
+      const btn = document.getElementById("checkBtn");
+      const out = document.getElementById("resultArea");
+      if (!sid) return;
+      btn.disabled = true;
+      btn.textContent = "Đang kiểm tra...";
+      out.innerHTML = "";
+      try {
+        const res = await fetch("/api/check-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionid: sid }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          out.innerHTML = `<div class="card">Lỗi: ${data.message || data.error}</div>`;
+          return;
+        }
+        let html = "";
+        for (const o of data.orders || []) {
+          const steps = (o.hanh_trinh_don_hang || [])
+            .map(
+              (s) => `
+              <div class="step">
+                <div class="step-time">${s.thoi_gian || ""}</div>
+                <div><strong>${s.trang_thai || ""}</strong> ${s.mo_ta || ""}</div>
+                ${s.buu_ta || s.sdt_buu_ta ? `<div>Shipper: ${s.buu_ta} ${s.sdt_buu_ta}</div>` : ""}
+              </div>`
+            )
+            .join("");
+          html += `
+            <div class="card">
+              <div class="order-header">
+                ${o.product_image ? `<img src="${o.product_image}" />` : ""}
+                <div>
+                  <div style="font-weight:600;margin-bottom:6px">${o.ten_san_pham} (x${o.so_luong})</div>
+                  <span class="badge">${o.order_status_title || o.order_status_name}</span>
+                  <span style="color:#94a3b8;font-size:13px;margin-left:8px">Mã đơn: #${o.order_id}</span>
+                </div>
+              </div>
+              <div class="grid">
+                <div><div class="label">Ngày giờ đặt đơn</div><div class="val">${o.ngay_gio_dat_don || "-"}</div></div>
+                <div><div class="label">Tiền COD / Tổng đơn</div><div class="val" style="color:#4ade80">${o.tien_cod_vnd}</div></div>
+                <div><div class="label">Người nhận</div><div class="val">${o.ten_nguoi_nhan || "-"}</div></div>
+                <div><div class="label">Số điện thoại</div><div class="val">${o.so_dien_thoai || "-"}</div></div>
+                <div style="grid-column: 1 / -1"><div class="label">Địa chỉ giao hàng</div><div class="val">${o.dia_chi || "-"}</div></div>
+                <div><div class="label">Đơn vị vận chuyển</div><div class="val">${o.don_vi_van_chuyen || "-"}</div></div>
+                <div><div class="label">Mã vận đơn</div><div class="val" style="color:#38bdf8">${o.ma_van_don || "Chưa có (Mã kiện: " + (o.ma_kien_hang || "-") + ")"}</div></div>
+                ${o.sdt_shipper ? `<div><div class="label">SĐT Shipper</div><div class="val">${o.ten_shipper || ""} - ${o.sdt_shipper}</div></div>` : ""}
+              </div>
+              <div class="timeline">
+                <div class="label" style="margin-bottom:8px">HÀNH TRÌNH ĐƠN HÀNG</div>
+                ${steps}
+              </div>
+            </div>`;
+        }
+        html += `<div class="card"><div class="label" style="margin-bottom:8px">JSON RESPONSE</div><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        out.innerHTML = html;
+      } catch (e) {
+        out.innerHTML = `<div class="card">Lỗi kết nối: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Kiểm tra";
+      }
+    }
+  </script>
+</body>
+</html>
+
