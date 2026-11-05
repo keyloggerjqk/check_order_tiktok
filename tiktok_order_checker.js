@@ -18,6 +18,8 @@
  *   POST http://localhost:3000/api/check-order  {"sessionid": "c4ca4f410c005abe4c3dc911a5250ec1"}
  */
 
+const fs = require("fs");
+const path = require("path");
 const http = require("http");
 const { URL } = require("url");
 
@@ -422,8 +424,36 @@ if (require.main === module) {
       };
 
       const parsedUrl = new URL(req.url, `http://localhost:${port}`);
+      if (parsedUrl.pathname === "/" || parsedUrl.pathname === "/index.html") {
+        const htmlPath = path.join(__dirname, "index.html");
+        if (fs.existsSync(htmlPath)) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(fs.readFileSync(htmlPath));
+        }
+      }
+      if (
+        parsedUrl.pathname === "/docs" ||
+        parsedUrl.pathname === "/swagger" ||
+        parsedUrl.pathname === "/docs.html"
+      ) {
+        const docsPath = path.join(__dirname, "docs.html");
+        if (fs.existsSync(docsPath)) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(fs.readFileSync(docsPath));
+        }
+      }
+      if (parsedUrl.pathname === "/openapi.json") {
+        const specPath = path.join(__dirname, "openapi.json");
+        if (fs.existsSync(specPath)) {
+          res.writeHead(200, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+          });
+          return res.end(fs.readFileSync(specPath));
+        }
+      }
       if (parsedUrl.pathname !== "/api/check-order") {
-        return sendJson(404, { error: "Use GET or POST /api/check-order" });
+        return sendJson(404, { error: "Use GET/POST /api/check-order or visit /docs for Swagger UI" });
       }
 
       if (req.method === "GET") {

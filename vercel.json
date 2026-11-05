@@ -4,6 +4,15 @@
     "api/check-order.js": {
       "maxDuration": 30
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/docs",
+      "destination": "/docs.html"
+    },
+    {
+      "source": "/swagger",
+      "destination": "/docs.html"
+    }
+  ]
 }
-

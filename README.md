@@ -13,6 +13,8 @@ Công cụ và API kiểm tra thông tin đơn hàng TikTok Shop chỉ bằng Co
 ## 1. Deploy lên Vercel
 Import trực tiếp repository này vào [Vercel](https://vercel.com/new) và bấm **Deploy**.
 - **Giao diện Web**: `https://<domain-cua-ban>.vercel.app/`
+- **Trang Swagger UI**: `https://<domain-cua-ban>.vercel.app/docs` (hoặc `/swagger`)
+- **OpenAPI Spec**: `https://<domain-cua-ban>.vercel.app/openapi.json`
 - **API GET**: `GET /api/check-order?sessionid=<SESSION_ID>`
 - **API POST**: `POST /api/check-order` với body `{"sessionid": "<SESSION_ID>"}`
 
@@ -24,3 +26,4 @@ node tiktok_order_checker.js <sessionid>
 # Hoặc chạy HTTP API Server tại cổng 3000
 npm start
 ```
+

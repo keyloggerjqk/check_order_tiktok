@@ -1,0 +1,200 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TikTok Shop Order Checker API",
+    "version": "1.0.0",
+    "description": "API tra cứu thông tin đơn hàng TikTok Shop trực tiếp bằng Cookie `sessionid`.\n\n### Thông tin trả về:\n- **Tên sản phẩm đầy đủ** (`ten_san_pham`), số lượng (`so_luong`), `product_id`, `sku_id`, ảnh sản phẩm (`product_image`)\n- **Ngày giờ đặt đơn** (`ngay_gio_dat_don`, múi giờ VN `UTC+7`)\n- **Người nhận & Liên hệ**: `ten_nguoi_nhan`, `so_dien_thoai` (SĐT gốc không bị che), `dia_chi`\n- **Tiền đơn hàng / COD**: `tien_cod_vnd`, `tien_cod_usd`\n- **Vận chuyển**: `ma_van_don`, `ma_kien_hang`, `don_vi_van_chuyen`, `ten_shipper`, `sdt_shipper`, `ngay_giao_du_kien`\n- **Hành trình đơn hàng**: `hanh_trinh_don_hang` (danh sách các mốc thời gian và trạng thái di chuyển của kiện hàng)"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current Server (Vercel / Local)"
+    }
+  ],
+  "paths": {
+    "/api/check-order": {
+      "get": {
+        "tags": ["Orders"],
+        "summary": "Kiểm tra đơn hàng bằng Query Parameter (GET)",
+        "description": "Truyền `sessionid` qua query string để lấy danh sách đơn hàng, thông tin người nhận, tiền COD, mã vận đơn và hành trình đơn hàng.",
+        "parameters": [
+          {
+            "name": "sessionid",
+            "in": "query",
+            "required": true,
+            "description": "Giá trị cookie `sessionid` (hoặc nguyên chuỗi `sessionid=...`)",
+            "schema": {
+              "type": "string",
+              "example": "a963b7a786c8ff787ee35ab63dcc39db"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kết quả kiểm tra đơn hàng thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu tham số sessionid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Orders"],
+        "summary": "Kiểm tra đơn hàng bằng JSON Body (POST)",
+        "description": "Truyền `sessionid` trong JSON body để lấy danh sách đơn hàng, thông tin người nhận, tiền COD, mã vận đơn và hành trình đơn hàng.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sessionid"],
+                "properties": {
+                  "sessionid": {
+                    "type": "string",
+                    "description": "Giá trị cookie `sessionid` (hoặc nguyên chuỗi `sessionid=...`)",
+                    "example": "a963b7a786c8ff787ee35ab63dcc39db"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kết quả kiểm tra đơn hàng thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderCheckResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu tham số sessionid trong JSON body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TrackingStep": {
+        "type": "object",
+        "properties": {
+          "thoi_gian": { "type": "string", "example": "2026-08-09 19:50:31" },
+          "timestamp": { "type": "integer", "example": 1786279831 },
+          "trang_thai": { "type": "string", "example": "Delivered" },
+          "mo_ta": { "type": "string", "example": "Your package has been delivered.\nRecipient: Customer" },
+          "dia_diem": { "type": "string", "example": "" },
+          "buu_ta": { "type": "string", "example": "" },
+          "sdt_buu_ta": { "type": "string", "example": "" }
+        }
+      },
+      "OrderItem": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string", "example": "585440415475991599" },
+          "ngay_gio_dat_don": { "type": "string", "example": "2026-08-08 14:53:16" },
+          "create_timestamp": { "type": "string", "example": "1786175596768" },
+          "order_status_code": { "type": "integer", "example": 5 },
+          "order_status_name": { "type": "string", "example": "500" },
+          "order_status_title": { "type": "string", "example": "Delivered" },
+          "order_status_detail": { "type": "string", "example": "Your package has been delivered.\nRecipient: Customer" },
+          "ten_san_pham": { "type": "string", "example": "LULLABY - NH467M - Áo BG ren cổ" },
+          "so_luong": { "type": "integer", "example": 1 },
+          "product_id": { "type": "string", "example": "1736612803567387901" },
+          "sku_id": { "type": "string", "example": "1736613094734333181" },
+          "seller_id": { "type": "string", "example": "7495665517495879933" },
+          "product_image": { "type": "string", "example": "https://p16-oec-sg.ibyteimg.com/tos-alisg-i-aphluv4xwc-sg/0d1e981e161a44999f8318931c49d20a~tplv-aphluv4xwc-resize-jpeg:200:200.jpeg" },
+          "ten_nguoi_nhan": { "type": "string", "example": "dương" },
+          "dia_chi": { "type": "string", "example": "xom 6 xuan dai, Xã Xuân Giang, Ninh Bình, Việt Nam" },
+          "so_dien_thoai": { "type": "string", "example": "(+84)365684902" },
+          "tien_cod_usd": { "type": "number", "example": 0.38937019740117657 },
+          "tien_cod_vnd": { "type": "string", "example": "10.000₫" },
+          "ma_van_don": { "type": "string", "nullable": true, "example": "862130926119" },
+          "ma_kien_hang": { "type": "string", "example": "3309890430678893615" },
+          "don_vi_van_chuyen": { "type": "string", "nullable": true, "example": "J&T Express" },
+          "ten_shipper": { "type": "string", "nullable": true, "example": null },
+          "sdt_shipper": { "type": "string", "nullable": true, "example": null },
+          "ngay_giao_du_kien": { "type": "string", "nullable": true, "example": "2026-11-08 -> 2026-11-11" },
+          "hanh_trinh_don_hang": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingStep"
+            }
+          }
+        }
+      },
+      "AddressItem": {
+        "type": "object",
+        "properties": {
+          "address_id": { "type": "string", "example": "7670559326452533013" },
+          "recipient_name": { "type": "string", "example": "dương" },
+          "phone": { "type": "string", "example": "(+84)365684902" },
+          "masked_phone": { "type": "string", "example": "(+84)36*****02" },
+          "address": { "type": "string", "example": "xom 6 xuan dai, Xã Xuân Giang, Ninh Bình, Việt Nam" },
+          "is_default": { "type": "boolean", "example": true }
+        }
+      },
+      "OrderCheckResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "has_orders": { "type": "boolean", "example": true },
+          "tab_summary": {
+            "type": "object",
+            "properties": {
+              "unpaid": { "type": "integer", "example": 0 },
+              "to_ship": { "type": "integer", "example": 1 },
+              "shipped": { "type": "integer", "example": 0 },
+              "to_review": { "type": "integer", "example": 0 },
+              "returns": { "type": "integer", "example": 0 }
+            }
+          },
+          "orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItem"
+            }
+          },
+          "address_book": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AddressItem"
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": { "type": "string", "example": "Missing sessionid parameter" }
+        }
+      }
+    }
+  }
+}
