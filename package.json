@@ -1,9 +1,8 @@
 {
   "name": "check_order_tiktok",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "TikTok Shop Order Checker API (Node.js & Vercel Serverless)",
-  "main": "tiktok_order_checker.js",
   "scripts": {
     "start": "node tiktok_order_checker.js --serve 3000"
   },

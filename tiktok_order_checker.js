@@ -409,79 +409,105 @@ async function checkTikTokOrders(sessionid) {
   };
 }
 
+async function requestHandler(req, res) {
+  const sendJson = (code, obj) => {
+    const body = JSON.stringify(obj, null, 2);
+    res.writeHead(code, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    res.end(body);
+  };
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    return res.end();
+  }
+
+  const parsedUrl = new URL(req.url || "/", "http://localhost");
+  if (parsedUrl.pathname === "/" || parsedUrl.pathname === "/index.html") {
+    const htmlPath = path.join(__dirname, "index.html");
+    if (fs.existsSync(htmlPath)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(fs.readFileSync(htmlPath));
+    }
+  }
+  if (
+    parsedUrl.pathname === "/docs" ||
+    parsedUrl.pathname === "/swagger" ||
+    parsedUrl.pathname === "/docs.html"
+  ) {
+    const docsPath = path.join(__dirname, "docs.html");
+    if (fs.existsSync(docsPath)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(fs.readFileSync(docsPath));
+    }
+  }
+  if (parsedUrl.pathname === "/openapi.json") {
+    const specPath = path.join(__dirname, "openapi.json");
+    if (fs.existsSync(specPath)) {
+      res.writeHead(200, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(fs.readFileSync(specPath));
+    }
+  }
+  if (parsedUrl.pathname !== "/api/check-order") {
+    return sendJson(404, { error: "Use GET/POST /api/check-order or visit /docs for Swagger UI" });
+  }
+
+  if (req.method === "GET") {
+    const sessionid = parsedUrl.searchParams.get("sessionid") || "";
+    if (!sessionid) return sendJson(400, { error: "Missing sessionid parameter" });
+    try {
+      const data = await checkTikTokOrders(sessionid);
+      return sendJson(200, data);
+    } catch (err) {
+      return sendJson(500, { success: false, error: err.message });
+    }
+  } else if (req.method === "POST") {
+    if (req.body) {
+      try {
+        const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body;
+        if (!body.sessionid) return sendJson(400, { error: "Missing sessionid in JSON body" });
+        const data = await checkTikTokOrders(body.sessionid);
+        return sendJson(200, data);
+      } catch (err) {
+        return sendJson(500, { success: false, error: err.message });
+      }
+    }
+    let raw = "";
+    req.on("data", (chunk) => (raw += chunk));
+    req.on("end", async () => {
+      try {
+        const body = JSON.parse(raw || "{}");
+        if (!body.sessionid) return sendJson(400, { error: "Missing sessionid in JSON body" });
+        const data = await checkTikTokOrders(body.sessionid);
+        return sendJson(200, data);
+      } catch (err) {
+        return sendJson(500, { success: false, error: err.message });
+      }
+    });
+  } else {
+    return sendJson(405, { error: "Method not allowed" });
+  }
+}
+
+module.exports = requestHandler;
+module.exports.checkTikTokOrders = checkTikTokOrders;
+
 if (require.main === module) {
   const args = process.argv.slice(2);
   if (args[0] === "--serve") {
     const port = Number(args[1]) || 3000;
-    const server = http.createServer(async (req, res) => {
-      const sendJson = (code, obj) => {
-        const body = JSON.stringify(obj, null, 2);
-        res.writeHead(code, {
-          "Content-Type": "application/json; charset=utf-8",
-          "Access-Control-Allow-Origin": "*",
-        });
-        res.end(body);
-      };
-
-      const parsedUrl = new URL(req.url, `http://localhost:${port}`);
-      if (parsedUrl.pathname === "/" || parsedUrl.pathname === "/index.html") {
-        const htmlPath = path.join(__dirname, "index.html");
-        if (fs.existsSync(htmlPath)) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(fs.readFileSync(htmlPath));
-        }
-      }
-      if (
-        parsedUrl.pathname === "/docs" ||
-        parsedUrl.pathname === "/swagger" ||
-        parsedUrl.pathname === "/docs.html"
-      ) {
-        const docsPath = path.join(__dirname, "docs.html");
-        if (fs.existsSync(docsPath)) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(fs.readFileSync(docsPath));
-        }
-      }
-      if (parsedUrl.pathname === "/openapi.json") {
-        const specPath = path.join(__dirname, "openapi.json");
-        if (fs.existsSync(specPath)) {
-          res.writeHead(200, {
-            "Content-Type": "application/json; charset=utf-8",
-            "Access-Control-Allow-Origin": "*",
-          });
-          return res.end(fs.readFileSync(specPath));
-        }
-      }
-      if (parsedUrl.pathname !== "/api/check-order") {
-        return sendJson(404, { error: "Use GET/POST /api/check-order or visit /docs for Swagger UI" });
-      }
-
-      if (req.method === "GET") {
-        const sessionid = parsedUrl.searchParams.get("sessionid") || "";
-        if (!sessionid) return sendJson(400, { error: "Missing sessionid parameter" });
-        try {
-          const data = await checkTikTokOrders(sessionid);
-          return sendJson(200, data);
-        } catch (err) {
-          return sendJson(500, { success: false, error: err.message });
-        }
-      } else if (req.method === "POST") {
-        let raw = "";
-        req.on("data", (chunk) => (raw += chunk));
-        req.on("end", async () => {
-          try {
-            const body = JSON.parse(raw || "{}");
-            if (!body.sessionid) return sendJson(400, { error: "Missing sessionid in JSON body" });
-            const data = await checkTikTokOrders(body.sessionid);
-            return sendJson(200, data);
-          } catch (err) {
-            return sendJson(500, { success: false, error: err.message });
-          }
-        });
-      } else {
-        return sendJson(405, { error: "Method not allowed" });
-      }
-    });
+    const server = http.createServer(requestHandler);
     server.listen(port, () => {
       console.log(`TikTok Order Checker API listening on http://127.0.0.1:${port}/api/check-order`);
     });
