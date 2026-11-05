@@ -25,6 +25,8 @@ function onOpen() {
     .addItem("▶️ Chạy kiểm tra đơn ngay", "checkAllTikTokOrders")
     .addItem("📋 Tạo dòng tiêu đề chuẩn (Dòng 1)", "setupSheetHeaders")
     .addSeparator()
+    .addItem("⏱️ Bật tự động check mỗi 15 phút", "enable15MinTrigger")
+    .addItem("⏱️ Bật tự động check mỗi 30 phút", "enable30MinTrigger")
     .addItem("⏰ Bật tự động check mỗi 1 tiếng", "enableHourlyTrigger")
     .addItem("🛑 Tắt tự động check", "disableTriggers")
     .addToUi();
@@ -173,6 +175,36 @@ function checkAllTikTokOrders() {
 }
 
 /**
+ * Cài đặt Trigger tự động chạy hàm checkAllTikTokOrders mỗi 15 phút
+ */
+function enable15MinTrigger() {
+  disableTriggers(false);
+  ScriptApp.newTrigger("checkAllTikTokOrders")
+    .timeBased()
+    .everyMinutes(15)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    "✅ Đã bật tự động kiểm tra đơn hàng TikTok mỗi 15 phút!"
+  );
+}
+
+/**
+ * Cài đặt Trigger tự động chạy hàm checkAllTikTokOrders mỗi 30 phút
+ */
+function enable30MinTrigger() {
+  disableTriggers(false);
+  ScriptApp.newTrigger("checkAllTikTokOrders")
+    .timeBased()
+    .everyMinutes(30)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    "✅ Đã bật tự động kiểm tra đơn hàng TikTok mỗi 30 phút!"
+  );
+}
+
+/**
  * Cài đặt Trigger tự động chạy hàm checkAllTikTokOrders mỗi 1 tiếng
  */
 function enableHourlyTrigger() {
@@ -201,3 +233,4 @@ function disableTriggers(showAlert = true) {
     SpreadsheetApp.getUi().alert("🛑 Đã tắt tự động kiểm tra mỗi 1 tiếng.");
   }
 }
+
