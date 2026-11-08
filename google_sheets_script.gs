@@ -34,14 +34,16 @@ function setupSheetHeaders() {
     "trạng thái đơn hàng",
     "hành trình cuối đơn hàng",
     "thời gian đặt",
-    "tên sản phẩm",
-    "cập nhật lúc"
+    "tên sản phẩm"
   ];
   var headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setValues([headers]);
   headerRange.setFontWeight("bold");
   headerRange.setBackground("#0f172a");
   headerRange.setFontColor("#ffffff");
+  if (sheet.getLastColumn() > headers.length) {
+    sheet.getRange(1, headers.length + 1, Math.max(sheet.getLastRow(), 1), sheet.getLastColumn() - headers.length).clear();
+  }
   sheet.setFrozenRows(1);
 }
 
@@ -150,7 +152,6 @@ function checkAllTikTokOrders() {
   }
 
   var cookieRange = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  var nowStr = Utilities.formatDate(new Date(), "Asia/Ho_Chi_Minh", "yyyy-MM-dd HH:mm:ss");
 
   for (var i = 0; i < cookieRange.length; i++) {
     var rowIndex = i + 2;
@@ -172,8 +173,8 @@ function checkAllTikTokOrders() {
 
       if (statusCode !== 200 || !json.success) {
         var errMsg = formatViError(json.message || json.error, statusCode);
-        sheet.getRange(rowIndex, 2, 1, 11).setValues([
-          ["", "", "", "", "", "", "Lỗi: " + errMsg, "", "", "", nowStr]
+        sheet.getRange(rowIndex, 2, 1, 10).setValues([
+          ["", "", "", "", "", "", "Lỗi: " + errMsg, "", "", ""]
         ]);
         applyCellStyle(statusCell, STATUS_STYLES.CANCELLED, true);
         continue;
@@ -183,7 +184,7 @@ function checkAllTikTokOrders() {
       if (orders.length === 0) {
         var addrList = json.address_book || [];
         var addr = addrList.length > 0 ? addrList[0] : {};
-        sheet.getRange(rowIndex, 2, 1, 11).setValues([
+        sheet.getRange(rowIndex, 2, 1, 10).setValues([
           [
             "Chưa có đơn",
             "",
@@ -194,8 +195,7 @@ function checkAllTikTokOrders() {
             "Không có đơn hàng",
             "",
             "",
-            "",
-            nowStr
+            ""
           ]
         ]);
         applyCellStyle(statusCell, STATUS_STYLES.DEFAULT, false);
@@ -245,7 +245,7 @@ function checkAllTikTokOrders() {
       var qtySuffix = " (x" + (order.so_luong || 1) + ")";
       var tenSanPham = /\(x\d+\)$/.test(rawProductName) ? rawProductName : (rawProductName + qtySuffix);
 
-      sheet.getRange(rowIndex, 2, 1, 11).setValues([
+      sheet.getRange(rowIndex, 2, 1, 10).setValues([
         [
           "'" + mvd,
           donViVanChuyen,
@@ -256,8 +256,7 @@ function checkAllTikTokOrders() {
           trangThai,
           hanhTrinhCuoi,
           thoiGianDat,
-          tenSanPham,
-          nowStr
+          tenSanPham
         ]
       ]);
 
@@ -266,8 +265,8 @@ function checkAllTikTokOrders() {
 
       Utilities.sleep(300);
     } catch (err) {
-      sheet.getRange(rowIndex, 2, 1, 11).setValues([
-        ["", "", "", "", "", "", "Lỗi kết nối: " + err.message, "", "", "", nowStr]
+      sheet.getRange(rowIndex, 2, 1, 10).setValues([
+        ["", "", "", "", "", "", "Lỗi kết nối: " + err.message, "", "", ""]
       ]);
       applyCellStyle(statusCell, STATUS_STYLES.CANCELLED, true);
     }
