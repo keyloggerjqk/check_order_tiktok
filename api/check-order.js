@@ -2,11 +2,49 @@ const OEC_BASE_URL = "https://oec-api.tiktokv.com";
 const API16_BASE_URL = "https://api16-normal-c-alisg.tiktokv.com";
 const COMMON_QUERY =
   "aid=1180&app_name=trill&version_code=470702&version_name=47.7.2" +
-  "&device_platform=android&os=android&region=VN&sys_region=VN&app_language=vi";
+  "&device_platform=android&os=android&region=VN&sys_region=VN&current_region=VN&priority_region=VN" +
+  "&app_language=vi&language=vi&locale=vi-VN&sys_language=vi";
 const DEFAULT_UA =
   "com.ss.android.ugc.trill/470702 (Linux; U; Android 13; vi_VN; Pixel 7; " +
   "Build/TD1A.220804.031; Cronet/TTNetVersion:c882992c 2024-09-01 QuicVersion:f29a1353 2024-08-20)";
 const USD_TO_VND_RATE = 25400;
+
+const ORDER_STATUS_VI_MAP = {
+  1: "Chờ thanh toán",
+  2: "Chờ vận chuyển",
+  3: "Đang giao hàng",
+  4: "Đã giao",
+  5: "Đã giao",
+  6: "Chờ đánh giá",
+  8: "Trả hàng / Hoàn tiền",
+  100: "Chờ thanh toán",
+  200: "Chờ vận chuyển",
+  300: "Đang giao hàng",
+  500: "Đã giao",
+};
+
+function normalizeViText(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/Người nhận:\s*Customer\b/gi, "Người nhận: Khách hàng")
+    .replace(/Recipient:\s*Customer\b/gi, "Người nhận: Khách hàng")
+    .replace(/^Delivered$/i, "Đã giao")
+    .replace(/^In transit$/i, "Đang trung chuyển")
+    .replace(/^Out for delivery$/i, "Trên đường giao")
+    .replace(/^Order placed$/i, "Đã đặt đơn hàng")
+    .replace(/^Completed$/i, "Hoàn thành")
+    .replace(/^Cancell?ed$/i, "Đã hủy");
+}
+
+function resolveStatusVi(orderStatusCode, pkgStatus) {
+  if (pkgStatus && ORDER_STATUS_VI_MAP[pkgStatus]) {
+    return ORDER_STATUS_VI_MAP[pkgStatus];
+  }
+  if (orderStatusCode != null && ORDER_STATUS_VI_MAP[orderStatusCode]) {
+    return ORDER_STATUS_VI_MAP[orderStatusCode];
+  }
+  return "";
+}
 
 function formatTs(tsVal) {
   if (!tsVal) return "";
@@ -26,6 +64,9 @@ function buildHeaders(sessionid) {
     Cookie: cookieStr,
     "User-Agent": DEFAULT_UA,
     "Content-Type": "application/json",
+    "Accept-Language": "vi-VN,vi;q=0.9",
+    "x-tt-locale": "vi-VN",
+    "oec-locale": "vi-VN",
     "x-tt-oec-opaque-enable": "1",
     "oec-cs-si-a": "2",
     "oec-cs-si-b": "1",
@@ -96,8 +137,8 @@ async function fetchOrderLogisticsAndProducts(oid, headers, fallbackCard, create
       if (detailItem.title || detailItem.description) {
         timeline.push({
           thoi_gian: formatTs(detailItem.time),
-          trang_thai: detailItem.title || "",
-          mo_ta: detailItem.description || "",
+          trang_thai: normalizeViText(detailItem.title || ""),
+          mo_ta: normalizeViText(detailItem.description || ""),
           dia_diem: detailItem.address || "",
         });
       }
@@ -177,8 +218,8 @@ async function fetchOrderLogisticsAndProducts(oid, headers, fallbackCard, create
         return {
           thoi_gian: formatTs(item.time),
           timestamp: item.time,
-          trang_thai: item.title || "",
-          mo_ta: item.description || "",
+          trang_thai: normalizeViText(item.title || ""),
+          mo_ta: normalizeViText(item.description || ""),
           dia_diem: item.address || "",
           buu_ta: cName,
           sdt_buu_ta: cPhone,
@@ -191,8 +232,8 @@ async function fetchOrderLogisticsAndProducts(oid, headers, fallbackCard, create
     timeline.push({
       thoi_gian: formatTs(createTime),
       timestamp: createTime,
-      trang_thai: fallbackCard.title || "Order placed",
-      mo_ta: fallbackCard.status_text || "",
+      trang_thai: normalizeViText(fallbackCard.title) || "Đã đặt đơn hàng",
+      mo_ta: normalizeViText(fallbackCard.status_text || ""),
       dia_diem: "",
     });
   }
@@ -332,20 +373,27 @@ async function checkTikTokOrders(sessionid) {
       prodList
         .filter((p) => p.product_title)
         .map((p) => (p.count > 1 ? `${p.product_title} (x${p.count})` : p.product_title))
-        .join(", ") || (productGid ? `Product #${productGid}` : "TikTok Shop Product");
+        .join(", ") || (productGid ? `Sản phẩm #${productGid}` : "Sản phẩm TikTok Shop");
 
     const latestStep = logInfo.timeline[0] || {};
     const trkNo = logInfo.tracking_no;
     const exactCodVnd = trkNo ? codByTracking[trkNo] : null;
+    const statusTitleVi =
+      normalizeViText(cardInfo.title) ||
+      normalizeViText(latestStep.trang_thai) ||
+      resolveStatusVi(rec.order_status, logInfo.package_status);
+    const statusDetailVi = normalizeViText(cardInfo.status_text || latestStep.mo_ta || "");
 
     ordersResult.push({
       order_id: oid,
       ngay_gio_dat_don: formatTs(rec.create_time),
       create_timestamp: rec.create_time,
       order_status_code: rec.order_status,
-      order_status_name: logInfo.package_status || cardInfo.title || "",
-      order_status_title: cardInfo.title || latestStep.trang_thai || "",
-      order_status_detail: cardInfo.status_text || latestStep.mo_ta || "",
+      order_status_name: logInfo.package_status || statusTitleVi || "",
+      order_status_title: statusTitleVi,
+      order_status_detail: statusDetailVi,
+      trang_thai_don_hang: statusTitleVi,
+      chi_tiet_trang_thai: statusDetailVi,
       ten_san_pham: fullProductTitle,
       so_luong: prodList.length > 0 ? prodList.reduce((s, p) => s + (p.count || 1), 0) : 1,
       product_id: firstProd.product_id || productGid,
@@ -371,6 +419,13 @@ async function checkTikTokOrders(sessionid) {
     success: true,
     has_orders: ordersResult.length > 0 || Object.values(tabCounts).some((v) => v > 0),
     tab_summary: tabCounts,
+    thong_ke_tab_vi: {
+      cho_thanh_toan: tabCounts.unpaid || 0,
+      cho_van_chuyen: tabCounts.to_ship || 0,
+      cho_nhan: tabCounts.shipped || 0,
+      cho_danh_gia: tabCounts.to_review || 0,
+      tra_hang: tabCounts.returns || 0,
+    },
     orders: ordersResult,
     address_book: defaultAddresses,
   };

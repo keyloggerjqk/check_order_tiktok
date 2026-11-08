@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TikTok Shop Order Checker</title>
+  <title>Tra cứu Đơn hàng TikTok Shop</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -147,8 +147,8 @@
               (s) => `
               <div class="step">
                 <div class="step-time">${s.thoi_gian || ""}</div>
-                <div><strong>${s.trang_thai || ""}</strong> ${s.mo_ta || ""}</div>
-                ${s.buu_ta || s.sdt_buu_ta ? `<div>Shipper: ${s.buu_ta} ${s.sdt_buu_ta}</div>` : ""}
+                <div><strong>${s.trang_thai || ""}</strong>${s.trang_thai && s.mo_ta ? " — " : ""}${s.mo_ta || ""}</div>
+                ${s.buu_ta || s.sdt_buu_ta ? `<div>Bưu tá: ${s.buu_ta || ""} ${s.sdt_buu_ta || ""}</div>` : ""}
               </div>`
             )
             .join("");
@@ -158,8 +158,9 @@
                 ${o.product_image ? `<img src="${o.product_image}" />` : ""}
                 <div>
                   <div style="font-weight:600;margin-bottom:6px">${o.ten_san_pham} (x${o.so_luong})</div>
-                  <span class="badge">${o.order_status_title || o.order_status_name}</span>
+                  <span class="badge">${o.trang_thai_don_hang || o.order_status_title || o.order_status_name}</span>
                   <span style="color:#94a3b8;font-size:13px;margin-left:8px">Mã đơn: #${o.order_id}</span>
+                  ${o.chi_tiet_trang_thai || o.order_status_detail ? `<div style="color:#cbd5e1;font-size:13px;margin-top:6px">${(o.chi_tiet_trang_thai || o.order_status_detail).replace(/\n/g, " — ")}</div>` : ""}
                 </div>
               </div>
               <div class="grid">
@@ -170,7 +171,7 @@
                 <div style="grid-column: 1 / -1"><div class="label">Địa chỉ giao hàng</div><div class="val">${o.dia_chi || "-"}</div></div>
                 <div><div class="label">Đơn vị vận chuyển</div><div class="val">${o.don_vi_van_chuyen || "-"}</div></div>
                 <div><div class="label">Mã vận đơn</div><div class="val" style="color:#38bdf8">${o.ma_van_don || "Chưa có (Mã kiện: " + (o.ma_kien_hang || "-") + ")"}</div></div>
-                ${o.sdt_shipper ? `<div><div class="label">SĐT Shipper</div><div class="val">${o.ten_shipper || ""} - ${o.sdt_shipper}</div></div>` : ""}
+                ${o.sdt_shipper ? `<div><div class="label">Bưu tá giao hàng</div><div class="val">${o.ten_shipper || ""} - ${o.sdt_shipper}</div></div>` : ""}
               </div>
               <div class="timeline">
                 <div class="label" style="margin-bottom:8px">HÀNH TRÌNH ĐƠN HÀNG</div>
@@ -178,7 +179,7 @@
               </div>
             </div>`;
         }
-        html += `<div class="card"><div class="label" style="margin-bottom:8px">JSON RESPONSE</div><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+        html += `<div class="card"><div class="label" style="margin-bottom:8px">DỮ LIỆU JSON TRẢ VỀ</div><pre>${JSON.stringify(data, null, 2)}</pre></div>`;
         out.innerHTML = html;
       } catch (e) {
         out.innerHTML = `<div class="card">Lỗi kết nối: ${e.message}</div>`;

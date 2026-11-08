@@ -1,23 +1,23 @@
 var API_URL = "https://checkordertiktok-seven.vercel.app/api/check-order";
 
 var STATUS_STYLES = {
-  DELIVERED: { bg: "#bbf7d0", fg: "#14532d" }, // Xanh lá (Giao thành công)
-  SHIPPING:  { bg: "#fef08a", fg: "#713f12" }, // Vàng (Đang giao / Chuẩn bị hàng)
-  RETURNED:  { bg: "#e9d5ff", fg: "#581c87" }, // Tím (Đơn hoàn / Trả hàng)
-  CANCELLED: { bg: "#fecaca", fg: "#7f1d1d" }, // Đỏ (Đơn huỷ / Lỗi)
-  DEFAULT:   { bg: "#f1f5f9", fg: "#334155" }  // Xám nhạt (Chưa có đơn)
+  DELIVERED: { bg: "#bbf7d0", fg: "#14532d" }, // Xanh lá (Đã giao / Hoàn thành)
+  SHIPPING:  { bg: "#fef08a", fg: "#713f12" }, // Vàng (Đang trung chuyển / Trên đường giao / Chuẩn bị vận chuyển)
+  RETURNED:  { bg: "#e9d5ff", fg: "#581c87" }, // Tím (Trả hàng / Hoàn tiền / Giao không thành công)
+  CANCELLED: { bg: "#fecaca", fg: "#7f1d1d" }, // Đỏ (Đã hủy / Lỗi cookie)
+  DEFAULT:   { bg: "#f1f5f9", fg: "#334155" }  // Xám nhạt (Không có đơn hàng)
 };
 
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
-  var menu = ui.createMenu("📦 TikTok Order Checker");
+  var menu = ui.createMenu("📦 Kiểm Tra Đơn TikTok");
   menu.addItem("▶️ Chạy kiểm tra đơn ngay", "checkAllTikTokOrders");
   menu.addItem("📋 Tạo dòng tiêu đề chuẩn (Dòng 1)", "setupSheetHeaders");
   menu.addSeparator();
-  menu.addItem("⏱️ Bật tự động check mỗi 15 phút", "enable15MinTrigger");
-  menu.addItem("⏱️ Bật tự động check mỗi 30 phút", "enable30MinTrigger");
-  menu.addItem("⏰ Bật tự động check mỗi 1 tiếng", "enableHourlyTrigger");
-  menu.addItem("🛑 Tắt tự động check", "disableTriggers");
+  menu.addItem("⏱️ Bật tự động kiểm tra mỗi 15 phút", "enable15MinTrigger");
+  menu.addItem("⏱️ Bật tự động kiểm tra mỗi 30 phút", "enable30MinTrigger");
+  menu.addItem("⏰ Bật tự động kiểm tra mỗi 1 tiếng", "enableHourlyTrigger");
+  menu.addItem("🛑 Tắt tự động kiểm tra", "disableTriggers");
   menu.addToUi();
 }
 
@@ -44,50 +44,93 @@ function setupSheetHeaders() {
   sheet.setFrozenRows(1);
 }
 
+function normalizeViText(str) {
+  if (!str) return "";
+  var s = String(str);
+  s = s.replace(/Người nhận:\s*Customer\b/gi, "Người nhận: Khách hàng");
+  s = s.replace(/Recipient:\s*Customer\b/gi, "Người nhận: Khách hàng");
+  s = s.replace(/^Delivered$/i, "Đã giao");
+  s = s.replace(/^In transit$/i, "Đang trung chuyển");
+  s = s.replace(/^Out for delivery$/i, "Trên đường giao");
+  s = s.replace(/^Order placed$/i, "Đã đặt đơn hàng");
+  s = s.replace(/^To pay$/i, "Chờ thanh toán");
+  s = s.replace(/^To ship$/i, "Chờ vận chuyển");
+  s = s.replace(/^To receive$/i, "Chờ nhận");
+  s = s.replace(/^Completed$/i, "Hoàn thành");
+  s = s.replace(/^Cancell?ed$/i, "Đã hủy");
+  s = s.replace(/\r?\n/g, " | ");
+  return s.trim();
+}
+
+function formatViError(errMsg, statusCode) {
+  var msg = String(errMsg || "").trim();
+  var low = msg.toLowerCase();
+  if (low.indexOf("missing sessionid") !== -1) {
+    return "Thiếu cookie sessionid";
+  }
+  if (low.indexOf("login") !== -1 || low.indexOf("session") !== -1 || statusCode === 401 || statusCode === 403) {
+    return "Cookie hết hạn hoặc không hợp lệ (" + msg + ")";
+  }
+  if (!msg && statusCode) {
+    return "Mã phản hồi HTTP " + statusCode;
+  }
+  return msg;
+}
+
 function classifyOrderStatusStyle(order, trangThaiText, hanhTrinhText) {
   var code = Number(order.order_status_code || 0);
   var statusName = String(order.order_status_name || "").toLowerCase();
   var combined = (statusName + " " + trangThaiText + " " + hanhTrinhText).toLowerCase();
 
-  // 1. Đơn hoàn / Trả hàng -> Màu Tím
+  // 1. Đơn hoàn / Trả hàng / Giao thất bại -> Màu Tím
   if (
     code === 8 ||
+    combined.indexOf("trả hàng") !== -1 ||
+    combined.indexOf("hoàn tiền") !== -1 ||
+    combined.indexOf("hoàn hàng") !== -1 ||
+    combined.indexOf("đơn hoàn") !== -1 ||
+    combined.indexOf("chuyển hoàn") !== -1 ||
+    combined.indexOf("hoàn") !== -1 ||
+    combined.indexOf("giao không thành công") !== -1 ||
+    combined.indexOf("giao hàng không thành công") !== -1 ||
+    combined.indexOf("không giao được") !== -1 ||
     combined.indexOf("return") !== -1 ||
     combined.indexOf("refund") !== -1 ||
-    combined.indexOf("hoàn") !== -1 ||
-    combined.indexOf("trả hàng") !== -1 ||
     combined.indexOf("unsuccessful") !== -1 ||
-    combined.indexOf("delivery failed") !== -1 ||
-    combined.indexOf("giao không thành công") !== -1
+    combined.indexOf("delivery failed") !== -1
   ) {
     return STATUS_STYLES.RETURNED;
   }
 
   // 2. Đơn huỷ -> Màu Đỏ
   if (
-    combined.indexOf("cancel") !== -1 ||
     combined.indexOf("đã hủy") !== -1 ||
     combined.indexOf("đã huỷ") !== -1 ||
     combined.indexOf("hủy đơn") !== -1 ||
-    combined.indexOf("huỷ đơn") !== -1
+    combined.indexOf("huỷ đơn") !== -1 ||
+    combined.indexOf("bị hủy") !== -1 ||
+    combined.indexOf("bị huỷ") !== -1 ||
+    combined.indexOf("cancel") !== -1
   ) {
     return STATUS_STYLES.CANCELLED;
   }
 
-  // 3. Đơn giao thành công -> Màu Xanh lá
+  // 3. Đơn giao thành công / Đã giao -> Màu Xanh lá
   if (
     code === 4 ||
     code === 5 ||
     statusName === "500" ||
-    statusName === "completed" ||
-    combined.indexOf("delivered") !== -1 ||
     combined.indexOf("đã giao") !== -1 ||
-    combined.indexOf("giao thành công") !== -1
+    combined.indexOf("giao thành công") !== -1 ||
+    combined.indexOf("hoàn thành") !== -1 ||
+    combined.indexOf("chờ đánh giá") !== -1 ||
+    statusName === "completed" ||
+    combined.indexOf("delivered") !== -1
   ) {
     return STATUS_STYLES.DELIVERED;
   }
 
-  // 4. Đơn đang giao / Đang vận chuyển / Đã đặt -> Màu Vàng
+  // 4. Đơn đang giao / Đang trung chuyển / Chuẩn bị vận chuyển / Đã đặt -> Màu Vàng
   return STATUS_STYLES.SHIPPING;
 }
 
@@ -127,7 +170,7 @@ function checkAllTikTokOrders() {
       var json = JSON.parse(response.getContentText() || "{}");
 
       if (statusCode !== 200 || !json.success) {
-        var errMsg = json.message || json.error || ("HTTP " + statusCode);
+        var errMsg = formatViError(json.message || json.error, statusCode);
         sheet.getRange(rowIndex, 2, 1, 10).setValues([
           ["", "", "", "", "", "Lỗi: " + errMsg, "", "", "", nowStr]
         ]);
@@ -164,9 +207,11 @@ function checkAllTikTokOrders() {
       var diaChi = order.dia_chi || "";
       var tienCod = order.tien_cod_vnd || "";
 
+      var statusTitle = normalizeViText(order.trang_thai_don_hang || order.order_status_title || "");
+      var statusDetail = normalizeViText(order.chi_tiet_trang_thai || order.order_status_detail || "");
       var trangThaiParts = [];
-      if (order.order_status_title) trangThaiParts.push(order.order_status_title);
-      if (order.order_status_detail) trangThaiParts.push(order.order_status_detail);
+      if (statusTitle) trangThaiParts.push(statusTitle);
+      if (statusDetail && statusDetail !== statusTitle) trangThaiParts.push(statusDetail);
       var trangThai = trangThaiParts.join(" - ");
 
       var timeline = order.hanh_trinh_don_hang || [];
@@ -175,16 +220,27 @@ function checkAllTikTokOrders() {
         var latest = timeline[0];
         var parts = [];
         if (latest.thoi_gian) parts.push("[" + latest.thoi_gian + "]");
-        if (latest.trang_thai) parts.push(latest.trang_thai);
-        if (latest.mo_ta) parts.push(String(latest.mo_ta).replace(/\n/g, " "));
-        if (latest.sdt_buu_ta) {
-          parts.push("(Shipper: " + (latest.buu_ta || "") + " " + latest.sdt_buu_ta + ")");
+        var stepTitle = normalizeViText(latest.trang_thai || "");
+        var stepDesc = normalizeViText(latest.mo_ta || "");
+        if (stepTitle && stepDesc) {
+          parts.push(stepTitle + " - " + stepDesc);
+        } else if (stepTitle) {
+          parts.push(stepTitle);
+        } else if (stepDesc) {
+          parts.push(stepDesc);
+        }
+        var buuTaTen = latest.buu_ta || order.ten_shipper || "";
+        var buuTaSdt = latest.sdt_buu_ta || order.sdt_shipper || "";
+        if (buuTaSdt) {
+          parts.push("(Bưu tá: " + (buuTaTen ? (buuTaTen + " - ") : "") + buuTaSdt + ")");
         }
         hanhTrinhCuoi = parts.join(" ");
       }
 
       var thoiGianDat = order.ngay_gio_dat_don ? ("'" + order.ngay_gio_dat_don) : "";
-      var tenSanPham = (order.ten_san_pham || "") + " (x" + (order.so_luong || 1) + ")";
+      var rawProductName = String(order.ten_san_pham || "");
+      var qtySuffix = " (x" + (order.so_luong || 1) + ")";
+      var tenSanPham = /\(x\d+\)$/.test(rawProductName) ? rawProductName : (rawProductName + qtySuffix);
 
       sheet.getRange(rowIndex, 2, 1, 10).setValues([
         [
@@ -207,7 +263,7 @@ function checkAllTikTokOrders() {
       Utilities.sleep(300);
     } catch (err) {
       sheet.getRange(rowIndex, 2, 1, 10).setValues([
-        ["", "", "", "", "", "Exception: " + err.message, "", "", "", nowStr]
+        ["", "", "", "", "", "Lỗi kết nối: " + err.message, "", "", "", nowStr]
       ]);
       applyCellStyle(statusCell, STATUS_STYLES.CANCELLED, true);
     }
