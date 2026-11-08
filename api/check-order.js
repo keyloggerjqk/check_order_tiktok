@@ -2,8 +2,8 @@ const OEC_BASE_URL = "https://oec-api.tiktokv.com";
 const API16_BASE_URL = "https://api16-normal-c-alisg.tiktokv.com";
 const COMMON_QUERY =
   "aid=1180&app_name=trill&version_code=470702&version_name=47.7.2" +
-  "&device_platform=android&os=android&region=VN&sys_region=VN&current_region=VN&priority_region=VN" +
-  "&app_language=vi&language=vi&locale=vi-VN&sys_language=vi";
+  "&device_platform=android&os=android&region=VN&sys_region=VN&current_region=VN&priority_region=VN&store_region=VN&carrier_region=VN" +
+  "&app_language=vi&language=vi&locale=vi-VN&sys_language=vi&tz_name=Asia%2FHo_Chi_Minh&tz_offset=25200";
 const DEFAULT_UA =
   "com.ss.android.ugc.trill/470702 (Linux; U; Android 13; vi_VN; Pixel 7; " +
   "Build/TD1A.220804.031; Cronet/TTNetVersion:c882992c 2024-09-01 QuicVersion:f29a1353 2024-08-20)";
@@ -67,6 +67,8 @@ function buildHeaders(sessionid) {
     "Accept-Language": "vi-VN,vi;q=0.9",
     "x-tt-locale": "vi-VN",
     "oec-locale": "vi-VN",
+    "x-tt-store-region": "vn",
+    "x-tt-store-region-src": "uid",
     "x-tt-oec-opaque-enable": "1",
     "oec-cs-si-a": "2",
     "oec-cs-si-b": "1",
@@ -305,7 +307,14 @@ async function checkTikTokOrders(sessionid) {
     }
   }
 
-  const recommendOrders = globalData.recommend_info?.orders || [];
+  const recommendOrders = [...(globalData.recommend_info?.orders || [])];
+  const seenOrderIds = new Set(recommendOrders.map((o) => o.order_id));
+  for (const oid of Object.keys(orderCards)) {
+    if (oid && !seenOrderIds.has(oid)) {
+      recommendOrders.unshift({ order_id: oid, create_time: "", order_status: 0, amount: "0", sub_orders: [] });
+      seenOrderIds.add(oid);
+    }
+  }
 
   const codByTracking = {};
   try {
